@@ -7,19 +7,42 @@
 
 ---
 
-## 0. 다음 세션이 가장 먼저 할 일
+## 0. 다음 세션이 가장 먼저 할 일 — **유저가 직접 URL로 테스트 가능 상태 만들기**
+
+> **최우선 목표:** 유저가 브라우저에서 dev 서버를 열고 **공식 테스트 URL**을 붙여넣어 즉시 사이드 패널 결과를 보고, 그 결과가 “납득되는 수준”이 되게 한다.
+> **공식 테스트 URL (canonical fixture):** `https://weolbu.com/product/5063`
+> **수용 기준:** 이 URL로 사이드 패널이 (a) 출처 카드 + (b) 갭 + (c) FOMO 1개 이상 + (d) 가격대 + (e) 대안 링크 + (f) 면책 모두 비어 있지 않게 렌더된다.
+
+### 0.1 부트스트랩
 
 ```bash
 cd /Users/song-euntaeg/Desktop/cuttingthefishingline
 git pull --ff-only
-npm install                 # 처음이라면
-npm --workspace web run dev # http://localhost:3000
+npm install                       # 처음이라면
+npm --workspace web run dev       # http://localhost:3000
 ```
 
-새 세션에 다음을 그대로 붙여넣으면 됩니다:
+### 0.2 즉시 동작 점검 (라이브 URL — 사람이 봐도 됨)
+
+브라우저에서 `http://localhost:3000` 접속 → 입력란에 다음을 붙여넣고 “낚시줄 끊기” 클릭:
+
+```
+https://weolbu.com/product/5063
+```
+
+또는 CLI에서 분석 결과만 즉시 보고 싶다면:
+
+```bash
+curl -sS -X POST http://localhost:3000/api/analyze \
+  -H 'content-type: application/json' \
+  -d '{"url":"https://weolbu.com/product/5063"}' | jq .
+```
+
+### 0.3 새 세션에 그대로 붙여넣을 부트 프롬프트
 
 > 레포 `cuttingthefishingline`의 `docs/HANDOFF.md`와 `docs/specs/*` 를 SSOT로 삼아 이어서 작업해줘.
-> 다음 우선 과제는 `docs/HANDOFF.md` §6 (Next Plan)의 N1부터 순서대로.
+> **최우선:** `docs/HANDOFF.md` §6 N1 — 사용자가 `https://weolbu.com/product/5063` URL로 직접 테스트할 때 사이드 패널이 “납득 가능”하게 렌더되도록 만든다.
+> 작업하는 동안 모든 변경은 그 URL의 실제 응답으로 검증해.
 
 ---
 
@@ -135,45 +158,90 @@ cuttingthefishingline/
 5. **rate-limit이 in-memory.** 서버 단일 인스턴스 가정. 배포 후 외부 스토어로 교체 필요.
 6. **테스트는 단위 단계.** API/통합/E2E 부재.
 
-## 6. Next Plan (우선순위, 다음 세션이 그대로 집을 수 있게)
+## 6. Next Plan (우선순위 — 다음 세션이 위에서 아래로 순서대로)
 
-### N1. 분석 정확도 — fixture 기반 통합 테스트 추가 *(우선)*
+> **N1이 끝나기 전에는 N2 이하로 넘어가지 말 것.** 유저가 손으로 직접 URL을 넣어 결과를 보고 “납득됨”이라고 말할 수 있는 상태가 우선이다.
 
-- `web/src/lib/analyzer/__tests__/fixtures/` 에 실제 랜딩 HTML 2~3개 (저작권 안전 — 짧은 발췌만) 저장.
-- `report.test.ts` 작성: `parseLanding(html)` → 갭/FOMO/가격이 기대 범위 안인지.
-- 가격 추출에서 “여러 가격 표기” 시 **메인 가격(가장 큰 KRW 또는 ‘정가/얼리버드’ 라벨 인접)** 선택 로직 추가.
+### **N1. 🔴 최우선 — `https://weolbu.com/product/5063` 으로 실제 테스트 통과시키기**
 
-### N2. UI 다듬기
+#### 목표
+유저가 `npm run dev` 후 브라우저에서 위 URL을 붙여넣었을 때, 사이드 패널이 비어 있지 않고 의미 있는 신호를 보여준다.
 
-- `Hero`에 캐치프레이즈 라인 모션(red→green 전환 강조).
-- 결과 영역에 **빈 상태/오류 상태** 카피 통일.
-- 모바일 폭에서 `lg:grid-cols-[360px_1fr]` 깨지는 케이스 점검.
-- 다크모드(시스템 prefers-color-scheme) 옵션 — 옵션이며 v0.2.
+#### 작업 절차 (다음 세션이 그대로 따라할 것)
 
-### N3. 확장 패키징
+1. **dev 서버를 띄우고 실 URL 호출.** `curl` 또는 브라우저에서 `https://weolbu.com/product/5063` 분석을 트리거. 응답 JSON과 렌더된 사이드 패널을 캡처.
+
+2. **무엇이 깨지거나 빈약한지 식별.** 예상되는 1차 문제들:
+   - SPA 렌더링이라 서버 fetch만으로는 본문/커리큘럼이 안 잡힐 수 있음 → fallback 전략 필요(예: `<noscript>` 텍스트, JSON-LD, `og:` 메타, `meta[name="description"]` 위주 분석으로 다운그레이드).
+   - 가격 표기 패턴이 사전 8개 패턴에 안 걸리는 케이스 가능 → 패턴 보강.
+   - 커리큘럼 라벨이 한국 강의 사이트 통용 표현(예: "이런 걸 배워요", "강의 소개", "강의 미리보기") 외 추가 라벨 필요.
+   - FOMO가 0건이면 광고 카피가 이미지/JS 안에 있는 경우 → 메타·hero 섹션에서 한 번 더 훑기.
+
+3. **수정 단위.** 한 번에 한 분석기만 고친다 — `parse.ts` → `fomo.ts` → `price.ts`. 변경 후 매번 같은 URL로 재호출.
+
+4. **fixture 캡처.** 처음 fetch 시 받은 HTML을 `web/src/lib/analyzer/__tests__/fixtures/weolbu-5063.html` 로 저장하고 (긴 콘텐츠는 잘라도 됨, 단 분석 대상 영역 — head/meta/hero/curriculum/price/cta — 은 보존), `report.test.ts` 추가:
+   ```ts
+   it("weolbu/product/5063 fixture: 사이드 패널 모든 섹션이 비어있지 않다", async () => {
+     const html = readFileSync(__dirname + "/fixtures/weolbu-5063.html", "utf8");
+     const parsed = parseLanding(html);
+     expect(parsed.title).toBeTruthy();
+     // gap/fomo/price/alternatives 가 최소 1개 이상씩
+   });
+   ```
+
+5. **수용 기준 (재확인).** 다음을 만족해야 N1 완료:
+   - [ ] `parsed.title` 있음
+   - [ ] `report.gap.curriculumItems.length >= 1` 또는 관찰 코멘트 의미 있음
+   - [ ] `report.fomo.length >= 1` (해당 페이지가 FOMO 카피를 쓰는 게 분명하므로)
+   - [ ] `report.price.amountKrw !== null`
+   - [ ] `report.alternatives.length >= 3`
+   - [ ] 면책이 화면에 노출
+   - [ ] `npm --workspace web run test` 9 + (신규 fixture) 통과
+   - [ ] 유저가 브라우저에서 같은 URL로 직접 확인 후 OK 사인
+
+6. **노트 남기기.** 발견한 사이트 특이점은 `docs/site-notes/weolbu.md` 에 정리(다른 사이트로 확장할 때 재사용). 위반/대응 못 하는 부분(예: SPA만 노출되는 가격)은 명시적 한계로 기록.
+
+#### 작업 중 지켜야 할 정책 (변경 금지)
+- 신호만 제공 / 비방 금지 / 유저 개시 URL만 / 면책 카피.
+- HTML 캡처 fixture는 분석에 필요한 최소 영역만, 저장 시 저작권 신중. 풀 페이지 HTML은 푸시하지 않는다(`.gitignore`에 `*.full.html` 추가 권장).
+
+---
+
+### N2. 분석 정확도 — fixture 기반 통합 테스트 확장 (N1 통과 후)
+
+- `__tests__/fixtures/` 에 추가 사이트 1~2개 (다른 플랫폼) 저장 → 파서 일반화 검증.
+- 가격 추출 “여러 가격 표기” 시 메인 가격 선택 휴리스틱 (정가/얼리버드 라벨 인접).
+- glossary 사전 확장 (해당 사이트들에 등장한 용어 추가).
+
+### N3. UI 다듬기
+
+- `Hero` 캐치프레이즈 모션(red→green 강조).
+- 빈 상태/오류 상태 카피 통일.
+- 모바일 폭(`lg:grid-cols-[360px_1fr]`) 점검.
+- 다크모드(prefers-color-scheme) — 옵션, v0.2.
+
+### N4. 확장 패키징
 
 - `extension/icons/icon-{16,48,128}.png` 실제 아이콘 추가.
 - `popup.html`에 “API 자동 검색” 버튼 (배포 후 기본 URL 자동 채움).
-- 빌드 시 `manifest.json`의 `host_permissions`에 배포 도메인을 추가하는 옵션 (현재는 비어 있음 — 의도적).
+- `manifest.json`의 `host_permissions`에 배포 도메인 옵션 추가(현재 의도적으로 비움).
 
-### N4. 배포 (Vercel)
+### N5. 배포 (Vercel)
 
-- `vercel.json` 또는 Vercel 프로젝트 연결 (web 워크스페이스 한정).
-- 환경변수: 현재 없음. 추가 시 `.env.example` 작성.
-- 배포 후 확장 `popup.html`의 placeholder 기본값을 그 URL로 업데이트.
+- Vercel 프로젝트 연결(web 워크스페이스 한정).
+- 배포 후 확장 `popup.html` placeholder 기본값을 배포 URL로 업데이트.
 
-### N5. v0.2 기능 (이번 세션 범위 밖)
+### N6. v0.2 기능 (범위 밖)
 
-- LLM 후처리 옵션 (Anthropic Claude Haiku/Sonnet) — “FOMO 근거” 자연어화, “갭 요약” 1줄.
+- LLM 후처리 옵션(Claude Haiku/Sonnet) — FOMO 근거 자연어화, 갭 요약 1줄.
 - 가격대별 가중치 정책 명문화 (`docs/policy-price-weighting.md`).
-- 사용자 피드백 채널 (이슈 템플릿 + 신고 폼).
-- 법무 메모: ToS/저작권 중립 카피 검수 (`docs/legal-notes.md` 초안).
+- 피드백 채널(이슈 템플릿 + 신고 폼).
+- 법무 메모(`docs/legal-notes.md`).
 
-### N6. 측정/지표 (스펙 1-pager §성공 지표)
+### N7. 측정/지표
 
-- `report` 응답 시 익명 카운터(가벼운 KV) 추가 — 베타 한정.
-  - 첫 가치 도달률, 대안 링크 클릭률(클라이언트 측 이벤트).
-- Mixpanel/PostHog 후보 — 플랫폼 결정 후 적용.
+- `report` 응답 시 익명 카운터(KV).
+- Mixpanel/PostHog 후보.
 
 ## 7. 합의된 비목표 (변경 금지)
 
