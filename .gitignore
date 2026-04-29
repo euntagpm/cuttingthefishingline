@@ -27,3 +27,6 @@ coverage
 
 # omc runtime artifacts
 .omc/
+
+# 추후 풀 페이지 캡처 (저작권/용량) — fixture 디렉터리 안의 *.full.html 만 차단
+**/__tests__/fixtures/*.full.html

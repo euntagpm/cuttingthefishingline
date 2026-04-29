@@ -1,9 +1,9 @@
 import type { PriceInfo, PriceTier } from "./types";
 
 const PATTERNS: RegExp[] = [
+  /([0-9]+)\s*만\s*([0-9]+)?\s*천?\s*원?/,
   /([0-9][0-9,]*)\s*원/,
   /₩\s*([0-9][0-9,]*)/,
-  /([0-9]+)\s*만\s*([0-9]+)?\s*천?\s*원?/,
 ];
 
 export function extractPrice(text: string): PriceInfo {
@@ -22,6 +22,20 @@ export function extractPrice(text: string): PriceInfo {
     }
   }
   return { raw: null, amountKrw: null };
+}
+
+/**
+ * JSON-LD에 있는 가격을 우선시한다. 텍스트 추출은 후기·리뷰의 금액 표현에 오염되기 쉬워
+ * 상품 메타가 있으면 그쪽이 절대 신뢰도 높음.
+ */
+export function pickPrice(jsonLdKrw: number | null, fromText: PriceInfo): PriceInfo {
+  if (jsonLdKrw != null && jsonLdKrw >= 1000) {
+    return {
+      raw: `${jsonLdKrw.toLocaleString("ko-KR")}원`,
+      amountKrw: Math.round(jsonLdKrw),
+    };
+  }
+  return fromText;
 }
 
 export function priceTier(amount: number | null): PriceTier {
