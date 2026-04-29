@@ -202,3 +202,4 @@ curl -sS -X POST https://cuttingthefishingline-web.vercel.app/api/analyze \
   git diff HEAD^ HEAD --quiet -- ../web ../package.json ../package-lock.json
   ```
 - **Production smoke test:** §10 끝 블록 참고. `provider: "google"` 이 떨어지면 정상.
+- **⚠️ Commit author email gating:** Vercel 기본값 "Limit deployment authorization" (Settings → Git) 이 ON 이면, **PR head commit 의 author email 이 GitHub 계정에 연결돼 있지 않을 때 머지 commit 의 Production 배포까지 거절된다.** 증상: GitHub 의 commit status 에 "Vercel: failure", PR 코멘트에 "No GitHub account was found matching the commit author email address". 해결: (a) 팀원이 `git config --global user.email <GitHub 등록 email 또는 noreply email>` 로 변경 후 다음 PR 부터 적용, 또는 (b) Settings → Git → Limit deployment authorization OFF (private repo 면 자원 남용 위험 낮음). 일시 우회로는 GitHub 연결된 author 가 main 에 사소한 commit 한 번 더 push 하면 그 commit 으로 새 빌드 트리거되며 누적된 코드까지 함께 배포된다.
