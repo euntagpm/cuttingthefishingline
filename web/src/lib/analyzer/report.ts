@@ -1,10 +1,6 @@
 import { fetchPage } from "./fetch";
 import { parseLanding } from "./parse";
-import { extractFomo } from "./fomo";
-import { extractPrice, pickPrice, priceTier } from "./price";
-import { detectTerms } from "./glossary";
-import { suggestAlternatives } from "./alternatives";
-import { buildGap } from "./gap";
+import { getLlmProvider, SYSTEM_PROMPT_PATH } from "./llm";
 import type { AnalysisReport } from "./types";
 
 export const DISCLAIMER =
@@ -13,14 +9,19 @@ export const DISCLAIMER =
 export async function buildReport(url: string): Promise<AnalysisReport> {
   const { html, finalUrl } = await fetchPage(url);
   const parsed = parseLanding(html);
-  // FOMO/용어 분석은 신뢰도 높은 출처(타이틀·메타) → 본문(리뷰 제거됨) 순으로 본다.
-  const fomo = extractFomo(parsed.title, parsed.description, parsed.text);
-  const priceFromText = extractPrice(parsed.fullText);
-  const price = pickPrice(parsed.jsonLd.priceKrw, priceFromText);
-  const tier = priceTier(price.amountKrw);
-  const terms = detectTerms(parsed.text);
-  const alternatives = suggestAlternatives(parsed.title, terms);
-  const gap = buildGap(parsed.marketingClaims, parsed.curriculumItems);
+  const provider = getLlmProvider();
+
+  const analyzed = await provider.analyze({
+    url,
+    finalUrl,
+    title: parsed.title,
+    description: parsed.description,
+    primaryText: parsed.text,
+    fullText: parsed.fullText,
+    marketingClaims: parsed.marketingClaims,
+    curriculumItems: parsed.curriculumItems,
+    jsonLd: { priceKrw: parsed.jsonLd.priceKrw },
+  });
 
   return {
     source: {
@@ -29,12 +30,11 @@ export async function buildReport(url: string): Promise<AnalysisReport> {
       description: parsed.description,
       fetchedAt: new Date().toISOString(),
     },
-    gap,
-    fomo,
-    price,
-    tier,
-    terms,
-    alternatives,
+    ...analyzed,
     disclaimer: DISCLAIMER,
+    meta: {
+      provider: provider.name,
+      systemPromptPath: `web/${SYSTEM_PROMPT_PATH}`,
+    },
   };
 }
