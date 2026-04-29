@@ -1,0 +1,26 @@
+# deps
+node_modules
+.pnp.*
+.yarn/*
+
+# build
+.next
+out
+dist
+build
+*.tsbuildinfo
+
+# env
+.env*
+!.env.example
+
+# misc
+.DS_Store
+*.log
+.vercel
+.turbo
+coverage
+
+# editor
+.vscode
+.idea

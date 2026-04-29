@@ -1,0 +1,13 @@
+{
+  "name": "cuttingthefishingline",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": ["web", "extension"],
+  "scripts": {
+    "dev": "npm --workspace web run dev",
+    "build": "npm --workspace web run build",
+    "start": "npm --workspace web run start",
+    "test": "npm --workspace web run test",
+    "ext:build": "npm --workspace extension run build"
+  }
+}

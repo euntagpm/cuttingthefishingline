@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>낚시줄끊기</title>
+    <style>
+      :root { color-scheme: light; }
+      body { font-family: -apple-system, "Pretendard", "Noto Sans KR", sans-serif; width: 280px; margin: 0; padding: 14px; color: #0f172a; }
+      h1 { font-size: 14px; margin: 0 0 8px; }
+      p { font-size: 12px; color: #475569; margin: 0 0 12px; }
+      button { width: 100%; padding: 10px 12px; border: 0; border-radius: 8px; background: #0f172a; color: white; font-weight: 600; cursor: pointer; }
+      .row { display: flex; gap: 6px; align-items: center; margin-top: 10px; }
+      input { flex: 1; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 12px; }
+      label { font-size: 11px; color: #64748b; }
+    </style>
+  </head>
+  <body>
+    <h1>낚시줄끊기</h1>
+    <p>이 페이지를 사이드 패널에서 신호로 정리합니다. 결정은 본인.</p>
+    <button id="open">이 페이지 분석</button>
+    <div class="row"><label for="api">API</label><input id="api" placeholder="https://your-deployment" /></div>
+    <script src="popup.js"></script>
+  </body>
+</html>
