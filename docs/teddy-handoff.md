@@ -1,8 +1,9 @@
 # 낚시줄끊기 — Teddy 핸드오프
 
 > 다음 개발자/에이전트가 이 문서 하나만 읽고 곧바로 이어받을 수 있도록 정리한 문서.
-> **마지막 업데이트:** 2026-04-29
+> **마지막 업데이트:** 2026-04-29 (Vercel 프로덕션 배포 반영)
 > **저장소:** https://github.com/euntagpm/cuttingthefishingline (PRIVATE)
+> **Production:** https://cuttingthefishingline-web.vercel.app (Vercel · LLM_PROVIDER=google, Gemini 2.5 Flash)
 > **최근 PR:** [#1 N1 통과](https://github.com/euntagpm/cuttingthefishingline/pull/1) · [#2 / ↔ /analysis 라우트 분리](https://github.com/euntagpm/cuttingthefishingline/pull/2) · [#3 LLM provider 추상화 + Google Gemini · 리포트 4개 항목 확장](https://github.com/euntagpm/cuttingthefishingline/pull/3)
 
 ---
@@ -16,6 +17,8 @@ npm install                               # 처음이라면
 cp web/.env.example web/.env.local        # 키 안 채워도 mock 으로 동작
 npm --workspace web run dev               # http://localhost:3000
 ```
+
+> 라이브 환경: https://cuttingthefishingline-web.vercel.app  (LLM_PROVIDER=google, Gemini 2.5 Flash) — 자세한 배포·롤백 절차는 §13 참고.
 
 브라우저에서 `http://localhost:3000` 의 입력란에 강의 URL을 붙여 넣고 클릭하면 자동으로 `/analysis?url=...` 로 이동해 좌측 iframe + 우측 분석 패널이 뜬다. 테스트 URL:
 
@@ -130,11 +133,12 @@ env 자리는 [web/.env.example](web/.env.example). `.env.local` 은 `.gitignore
 - [ ] iframe 차단 사이트 (weolbu 포함) 용 서버측 페이지 미리보기(스크린샷/프록시) — Playwright 후보.
 - [ ] 익스텐션(`extension/**`) 을 동일 분석 흐름에 맞춰 갱신 (현재는 손대지 않음).
 - [ ] mock 휴리스틱 키워드 추출의 불용어 사전 보강 ("만드는", "방법", "투자로" 같은 일반 동사·결합형 제거).
+- [ ] rate-limit 을 Vercel KV / Upstash Redis 같은 외부 스토어로 이전 (serverless 환경에선 인-메모리가 인스턴스마다 분리돼 사실상 무력).
 
 ## 9. 알려진 제약
 
 - **iframe 임베드 차단**: weolbu 등은 X-Frame-Options/CSP `frame-ancestors` 로 임베드를 거부한다. 클라이언트에서 우회 불가능. 헤더 "새 탭으로 열기" 가 폴백.
-- **rate-limit 인-메모리**: 기존 그대로. 배포 시 외부 스토어 필요.
+- **rate-limit 인-메모리**: ⚠️ Vercel serverless 환경에선 함수 인스턴스마다 메모리가 분리되므로 사실상 무력화됨. 외부 스토어(Vercel KV / Upstash Redis 등)로 이전 필요. — §8 백로그.
 - **dev 서버와 production build 충돌**: dev 서버가 떠 있는 동안 `npm run build` 를 돌리면 `.next` 안에 dev 청크와 prod 청크가 섞여 webpack runtime 이 청크 해시를 못 찾는 상태가 된다. 빌드 검증 시엔 dev 서버를 끄고 `rm -rf web/.next` 후 빌드.
 
 ## 10. 검증 명령
@@ -152,6 +156,13 @@ curl -sS -X POST http://localhost:3000/api/analyze \
   -H 'content-type: application/json' \
   -d '{"url":"https://weolbu.com/product/5063"}' | jq '.report.meta'
 # → { "provider": "mock" } (키 없을 때) 또는 "google" (있을 때)
+
+# Production smoke test
+curl -sS -X POST https://cuttingthefishingline-web.vercel.app/api/analyze \
+  -H 'content-type: application/json' \
+  -d '{"url":"https://weolbu.com/product/5063"}' | jq '.report.meta'
+# → { "provider": "google", "systemPromptPath": "web/src/lib/analyzer/llm/prompts/system-ko.md" } 기대.
+# 실패 시 Vercel Dashboard → Logs 에서 /api/analyze 함수 로그 먼저 확인.
 ```
 
 ## 11. 비목표 (변경 금지)
@@ -166,3 +177,28 @@ curl -sS -X POST http://localhost:3000/api/analyze \
 - prefix: `feat:`, `fix:`, `chore:`, `docs:`, `test:`, `refactor:`
 - 본문: 한국어 OK. **변경 "무엇"보다 "왜"** 위주.
 - 트레일러: `Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>`
+
+## 13. 배포 (Production)
+
+- **Host:** Vercel · Project: `cuttingthefishingline-web` · Region: `icn1` (Seoul, auto)
+- **Production URL:** https://cuttingthefishingline-web.vercel.app
+- **Root Directory 설정:** `web` (모노레포 — Vercel Project Settings → General → Root Directory)
+- **Framework Preset:** Next.js (자동 감지, Build/Install/Output 모두 기본값)
+- **Branch → Deploy 매핑:**
+  - `main` 푸시 → Production 자동 배포
+  - 그 외 브랜치 / PR → Preview URL 자동 생성 (`cuttingthefishingline-web-git-<branch>-<scope>.vercel.app`)
+- **Env vars (Vercel Dashboard → Settings → Environment Variables, Production + Preview):**
+  - `LLM_PROVIDER=google`
+  - `GOOGLE_API_KEY=***` (Sensitive — 한 번 저장 후 plaintext 재조회 불가)
+  - `GEMINI_MODEL=gemini-2.5-flash`
+  - **GitHub 레포에는 키가 들어가지 않는다.** `.gitignore` 의 `.env*` + `!.env.example` 규칙으로 `.env.local` 자체가 커밋 차단됨. Vercel 측 Secret Storage 에만 존재.
+- **Deployment Protection:** 디자인/UX polish 단계에서는 **Vercel Authentication ON 권장** (Settings → Deployment Protection). 외부 베타 시작 시 OFF.
+- **재배포:** Dashboard → Deployments → 원하는 빌드의 ⋯ → **Redeploy**. 또는 `main` 에 빈 커밋 푸시.
+- **롤백:** Dashboard → Deployments → 직전 성공 빌드의 ⋯ → **Promote to Production**.
+- **로그/모니터링:** Dashboard → **Logs** (실시간 함수 로그, `/api/analyze` 트레이스), **Analytics** (요청량). LLM 4xx/5xx 디버깅은 여기부터.
+- **API 키 회전:** AI Studio 에서 신규 키 발급 → Vercel env 값만 교체 → **Redeploy 필수** (이미 도는 함수 인스턴스는 옛 값을 메모리에 들고 있음).
+- **모노레포 빌드 무시 (선택):** `extension/` 만 변경된 커밋에서 빌드 스킵하려면 Settings → Git → Ignored Build Step 에:
+  ```bash
+  git diff HEAD^ HEAD --quiet -- ../web ../package.json ../package-lock.json
+  ```
+- **Production smoke test:** §10 끝 블록 참고. `provider: "google"` 이 떨어지면 정상.
