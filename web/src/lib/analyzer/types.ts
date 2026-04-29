@@ -30,8 +30,10 @@ export type PriceInfo = {
 export type PriceTier = "unknown" | "low" | "mid" | "high";
 
 export type AnalysisMeta = {
-  /** 분석에 사용된 LLM provider 이름. mock 이면 가상 응답. */
+  /** 실제 응답을 만든 provider. 폴백이 일어났다면 "mock". */
   provider: "mock" | "anthropic" | "openai" | "google";
+  /** 원래 요청된 provider. 폴백이 일어났을 때 그 이름이 들어가고, 정상 응답이면 null. */
+  fallbackFrom: "mock" | "anthropic" | "openai" | "google" | null;
   /** 사용자가 톤·기준을 수정할 수 있는 시스템 프롬프트 파일 경로(레포 루트 기준 표시용). */
   systemPromptPath: string;
 };
