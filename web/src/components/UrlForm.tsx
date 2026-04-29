@@ -20,7 +20,7 @@ export function UrlForm({ onSubmit, loading }: { onSubmit: (url: string) => void
         placeholder="https://강의-랜딩-주소를-붙여넣으세요"
         value={url}
         onChange={(e) => setUrl(e.target.value)}
-        className="flex-1 rounded-lg border border-slate-300 bg-white px-4 py-3 text-base shadow-sm focus:border-ink focus:outline-none"
+        className="flex-1 rounded-lg border border-slate-300 bg-white px-4 py-3 text-base text-ink shadow-sm placeholder:text-slate-400 focus:border-ink focus:outline-none"
       />
       <button
         type="submit"
