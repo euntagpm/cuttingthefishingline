@@ -24,3 +24,6 @@ coverage
 # editor
 .vscode
 .idea
+
+# omc runtime artifacts
+.omc/
