@@ -18,37 +18,56 @@ function AnalysisContent() {
   const [report, setReport] = useState<AnalysisReport | null>(null);
 
   const [panelWidth, setPanelWidth] = useState(DEFAULT_WIDTH);
-  const isDragging = useRef(false);
-  const dragStartX = useRef(0);
-  const dragStartWidth = useRef(DEFAULT_WIDTH);
+  // Pointer Events + setPointerCapture 패턴: 드래그 중 포인터가 좌측 iframe 위로
+  // 가도 핸들 요소가 포인터를 계속 소유하므로 pointerup 이 보장된다.
+  // (기존 window mousemove/mouseup 방식은 iframe 이 mouseup 을 가로채 isDragging 이
+  // 영원히 true 로 남아 클릭 없이도 패널이 계속 줄어들던 버그가 있었음.)
+  const dragState = useRef<{ active: boolean; startX: number; startWidth: number }>({
+    active: false,
+    startX: 0,
+    startWidth: DEFAULT_WIDTH,
+  });
 
-  useEffect(() => {
-    function onMouseMove(e: MouseEvent) {
-      if (!isDragging.current) return;
-      const delta = dragStartX.current - e.clientX;
-      setPanelWidth(Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, dragStartWidth.current + delta)));
-    }
-    function onMouseUp() {
-      isDragging.current = false;
-      document.body.style.cursor = "";
-      document.body.style.userSelect = "";
-    }
-    window.addEventListener("mousemove", onMouseMove);
-    window.addEventListener("mouseup", onMouseUp);
-    return () => {
-      window.removeEventListener("mousemove", onMouseMove);
-      window.removeEventListener("mouseup", onMouseUp);
+  function onPointerDown(e: React.PointerEvent<HTMLDivElement>) {
+    if (e.button !== 0) return; // 좌클릭/주 포인터만
+    e.preventDefault();
+    dragState.current = {
+      active: true,
+      startX: e.clientX,
+      startWidth: panelWidth,
     };
-  }, []);
-
-  function onDragStart(e: React.MouseEvent) {
-    isDragging.current = true;
-    dragStartX.current = e.clientX;
-    dragStartWidth.current = panelWidth;
+    e.currentTarget.setPointerCapture(e.pointerId);
     document.body.style.cursor = "col-resize";
     document.body.style.userSelect = "none";
-    e.preventDefault();
   }
+
+  function onPointerMove(e: React.PointerEvent<HTMLDivElement>) {
+    if (!dragState.current.active) return;
+    const delta = dragState.current.startX - e.clientX;
+    setPanelWidth(
+      Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, dragState.current.startWidth + delta)),
+    );
+  }
+
+  function endDrag(e: React.PointerEvent<HTMLDivElement>) {
+    if (!dragState.current.active) return;
+    dragState.current.active = false;
+    if (e.currentTarget.hasPointerCapture?.(e.pointerId)) {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    }
+    document.body.style.cursor = "";
+    document.body.style.userSelect = "";
+  }
+
+  // 컴포넌트 언마운트 중 드래그가 활성 상태였다면 body 스타일 복구.
+  useEffect(() => {
+    return () => {
+      if (dragState.current.active) {
+        document.body.style.cursor = "";
+        document.body.style.userSelect = "";
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (!url) return;
@@ -110,8 +129,14 @@ function AnalysisContent() {
 
         {/* Drag handle */}
         <div
-          className="w-1 shrink-0 cursor-col-resize bg-slate-200 transition-colors hover:bg-slate-400"
-          onMouseDown={onDragStart}
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="패널 너비 조절"
+          className="w-1 shrink-0 cursor-col-resize touch-none bg-slate-200 transition-colors hover:bg-slate-400"
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={endDrag}
+          onPointerCancel={endDrag}
         />
 
         {/* Right: Report panel */}
